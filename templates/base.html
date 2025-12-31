@@ -1,24 +1,26 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}EasiVisi{% endblock %} - Visual AI Training Platform</title>
     <meta name="description" content="Train custom YOLO object detection models without writing code">
-    
+
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
+
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
-    
+
     <!-- Custom CSS -->
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    
+
     {% block head %}{% endblock %}
 </head>
+
 <body>
     <!-- Navigation -->
     <nav class="navbar">
@@ -27,12 +29,13 @@
                 <i class="fas fa-eye"></i>
                 <span>EasiVisi</span>
             </a>
-            
+
             <div class="nav-links">
                 <a href="/" class="nav-link {% if request.endpoint == 'index' %}active{% endif %}">
                     <i class="fas fa-home"></i> Home
                 </a>
-                <a href="/dataset" class="nav-link {% if 'dataset' in request.endpoint %}active{% endif %}">
+                <a href="/dataset"
+                    class="nav-link {% if request.endpoint and 'dataset' in request.endpoint %}active{% endif %}">
                     <i class="fas fa-database"></i> Datasets
                 </a>
                 <a href="/train" class="nav-link {% if request.endpoint == 'train_page' %}active{% endif %}">
@@ -45,13 +48,13 @@
                     <i class="fas fa-history"></i> Runs
                 </a>
             </div>
-            
+
             <button class="nav-toggle" id="navToggle">
                 <i class="fas fa-bars"></i>
             </button>
         </div>
     </nav>
-    
+
     <!-- Mobile Menu -->
     <div class="mobile-menu" id="mobileMenu">
         <a href="/" class="mobile-link">Home</a>
@@ -60,12 +63,12 @@
         <a href="/inference" class="mobile-link">Inference</a>
         <a href="/runs" class="mobile-link">Runs</a>
     </div>
-    
+
     <!-- Main Content -->
     <main class="main-content">
         {% block content %}{% endblock %}
     </main>
-    
+
     <!-- Footer -->
     <footer class="footer">
         <div class="footer-content">
@@ -73,17 +76,17 @@
             <p>Powered by <a href="https://ultralytics.com" target="_blank">Ultralytics YOLOv8</a></p>
         </div>
     </footer>
-    
+
     <!-- Toast Container -->
     <div class="toast-container" id="toastContainer"></div>
-    
+
     <!-- Common Scripts -->
     <script>
         // Mobile menu toggle
         document.getElementById('navToggle')?.addEventListener('click', () => {
             document.getElementById('mobileMenu').classList.toggle('active');
         });
-        
+
         // Toast notification function
         function showToast(message, type = 'info') {
             const container = document.getElementById('toastContainer');
@@ -94,14 +97,14 @@
                 <span>${message}</span>
             `;
             container.appendChild(toast);
-            
+
             setTimeout(() => toast.classList.add('show'), 10);
             setTimeout(() => {
                 toast.classList.remove('show');
                 setTimeout(() => toast.remove(), 300);
             }, 3000);
         }
-        
+
         // API helper
         async function apiCall(url, options = {}) {
             try {
@@ -123,7 +126,8 @@
             }
         }
     </script>
-    
+
     {% block scripts %}{% endblock %}
 </body>
+
 </html>
