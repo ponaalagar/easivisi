@@ -112,7 +112,8 @@
         <!-- Keyboard Shortcuts -->
         <div class="shortcuts-help">
             <p><kbd>B</kbd> Box tool | <kbd>S</kbd> Select | <kbd>Del</kbd> Delete | <kbd>←→</kbd> Navigate |
-                <kbd>Ctrl+S</kbd> Save</p>
+                <kbd>Ctrl+S</kbd> Save
+            </p>
         </div>
     </main>
 </div>
@@ -124,7 +125,7 @@
     const datasetName = "{{ dataset.name }}";
     const classes = [
         {% for cls in dataset.classes %}
-    { id: { { loop.index0 } }, name: "{{ cls }}", color: `hsl({{ loop.index0 * 45 }}, 70%, 50%)` },
+    { id: {{ loop.index0 }}, name: "{{ cls }}", color: `hsl({{ loop.index0 * 45 }}, 70%, 50%)` },
     {% endfor %}
     ];
 

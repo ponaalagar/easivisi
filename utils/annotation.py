@@ -38,22 +38,27 @@ def save_yolo_label(label_path, annotations):
 
 
 def yolo_to_pixel(yolo_box, img_width, img_height):
-    """Convert YOLO format (normalized) to pixel coordinates."""
+    """Convert YOLO format (normalized) to pixel coordinates.
+    
+    Returns annotations in the format expected by the frontend:
+    - x, y: top-left corner in pixels
+    - width, height: box dimensions in pixels
+    - class_id: the class identifier
+    """
     x_center = yolo_box['x_center'] * img_width
     y_center = yolo_box['y_center'] * img_height
     width = yolo_box['width'] * img_width
     height = yolo_box['height'] * img_height
     
-    x1 = x_center - width / 2
-    y1 = y_center - height / 2
-    x2 = x_center + width / 2
-    y2 = y_center + height / 2
+    # Calculate top-left corner
+    x = x_center - width / 2
+    y = y_center - height / 2
     
     return {
-        'x1': int(x1),
-        'y1': int(y1),
-        'x2': int(x2),
-        'y2': int(y2),
+        'x': x,
+        'y': y,
+        'width': width,
+        'height': height,
         'class_id': yolo_box['class_id']
     }
 
@@ -142,7 +147,20 @@ def save_annotations_for_image(image_path, labels_base_path, annotations, img_wi
     # Convert pixel to YOLO format
     yolo_annotations = []
     for ann in annotations:
-        yolo_box = pixel_to_yolo(ann, img_width, img_height)
+        # Handle both formats: {x, y, width, height} and {x1, y1, x2, y2}
+        if 'x1' in ann:
+            # Already in x1, y1, x2, y2 format
+            pixel_box = ann
+        else:
+            # Convert from x, y, width, height format
+            pixel_box = {
+                'x1': ann['x'],
+                'y1': ann['y'],
+                'x2': ann['x'] + ann['width'],
+                'y2': ann['y'] + ann['height'],
+                'class_id': ann['class_id']
+            }
+        yolo_box = pixel_to_yolo(pixel_box, img_width, img_height)
         yolo_annotations.append(yolo_box)
     
     save_yolo_label(label_path, yolo_annotations)
