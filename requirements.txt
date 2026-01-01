@@ -18,6 +18,6 @@ tensorboard==2.20.0
 
 # Dataset & evaluation
 pyyaml==6.0.3
-pandas==2.3.2
+pandas==2.3.3
 scikit-learn==1.3.2
 pycocotools==2.0.11   # install separately if COCO evaluation is needed
