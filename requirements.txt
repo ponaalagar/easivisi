@@ -8,7 +8,7 @@ ultralytics-thop==2.0.18   # model profiling helper
 
 # Image processing
 opencv-python==4.11.0.86
-numpy==1.26.4
+numpy==2.4.0
 pillow==11.3.0
 
 # Visualization & logging
