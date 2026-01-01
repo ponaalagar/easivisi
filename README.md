@@ -248,9 +248,9 @@ flake8 .
 ## 📝 Roadmap
 
 - [x] YOLOv8 training integration
-- [ ] Flask web interface for annotation
-- [ ] Real-time training visualization
-- [ ] Model export to ONNX, TensorRT
+- [x] Flask web interface for annotation
+- [x] Real-time training visualization
+- [x] Model export to ONNX, TensorRT
 - [ ] Docker containerization
 - [ ] REST API for inference
 - [ ] Multi-user support with authentication
@@ -316,7 +316,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 **Made with ❤️ for the Computer Vision Community**
 
-[Report Bug](https://github.com/yourusername/easivisi/issues) · [Request Feature](https://github.com/yourusername/easivisi/issues)
+[Report Bug](https://github.com/ponaalagar/easivisi/issues) · [Request Feature](https://github.com/ponaalagar/easivisi/issues)
 
 </div>
 
