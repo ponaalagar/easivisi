@@ -200,21 +200,38 @@ def api_dataset_stats(dataset_name):
 def api_list_images(dataset_name):
     """List all images in a dataset."""
     base_path = os.path.join(Config.DATASET_DIR, dataset_name, 'images')
+    labels_base = os.path.join(Config.DATASET_DIR, dataset_name, 'labels')
     images = []
+    annotated_count = 0
     
     # Check all locations
     for subdir in ['', 'train', 'val']:
         check_path = os.path.join(base_path, subdir) if subdir else base_path
+        labels_path = os.path.join(labels_base, subdir) if subdir else labels_base
         if os.path.exists(check_path):
             for f in os.listdir(check_path):
                 if f.lower().endswith(tuple(Config.ALLOWED_IMAGE_EXTENSIONS)):
+                    # Check if label file exists
+                    label_name = os.path.splitext(f)[0] + '.txt'
+                    label_file = os.path.join(labels_path, label_name)
+                    has_annotation = os.path.exists(label_file) and os.path.getsize(label_file) > 0
+                    
+                    if has_annotation:
+                        annotated_count += 1
+                    
                     images.append({
                         'name': f,
                         'path': os.path.join(subdir, f) if subdir else f,
-                        'split': subdir or 'unsplit'
+                        'split': subdir or 'unsplit',
+                        'annotated': has_annotation
                     })
     
-    return jsonify({'images': images})
+    return jsonify({
+        'images': images,
+        'total': len(images),
+        'annotated': annotated_count,
+        'remaining': len(images) - annotated_count
+    })
 
 
 @app.route('/api/dataset/<dataset_name>/delete', methods=['DELETE'])
