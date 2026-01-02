@@ -27,45 +27,28 @@ EasiVisi is a powerful, user-friendly **Flask web application** that enables use
 
 ## 📸 Screenshots
 
-<details>
-<summary><strong>🖥️ Dashboard & Dataset Management</strong></summary>
-<br>
-
-![Dashboard](static/images/Screenshot%202026-01-01%20221029.png)
-
-</details>
-
-<details>
-<summary><strong>✏️ Image Annotation Tool</strong></summary>
-<br>
-
-![Annotation Tool](static/images/Screenshot%202026-01-01%20221123.png)
-
-</details>
-
-<details>
-<summary><strong>🏷️ Class Label Configuration</strong></summary>
-<br>
-
-![Class Configuration](static/images/Screenshot%202026-01-01%20221141.png)
-
-</details>
-
-<details>
-<summary><strong>⚙️ Training Configuration</strong></summary>
-<br>
-
-![Training Setup](static/images/Screenshot%202026-01-01%20221232.png)
-
-</details>
-
-<details>
-<summary><strong>🎯 Object Detection Inference</strong></summary>
-<br>
-
-![Inference Results](static/images/Screenshot%202026-01-01%20221311.png)
-
-</details>
+<table>
+  <tr>
+    <td align="center"><strong>🖥️ Dashboard</strong></td>
+    <td align="center"><strong>✏️ Annotation Tool</strong></td>
+    <td align="center"><strong>🏷️ Class Config</strong></td>
+  </tr>
+  <tr>
+    <td><img src="static/images/Screenshot%202026-01-01%20221029.png" width="300"/></td>
+    <td><img src="static/images/Screenshot%202026-01-01%20221123.png" width="300"/></td>
+    <td><img src="static/images/Screenshot%202026-01-01%20221141.png" width="300"/></td>
+  </tr>
+  <tr>
+    <td align="center"><strong>⚙️ Training Config</strong></td>
+    <td align="center"><strong>🎯 Inference</strong></td>
+    <td></td>
+  </tr>
+  <tr>
+    <td><img src="static/images/Screenshot%202026-01-01%20221232.png" width="300"/></td>
+    <td><img src="static/images/Screenshot%202026-01-01%20221311.png" width="300"/></td>
+    <td></td>
+  </tr>
+</table>
 
 ---
 
