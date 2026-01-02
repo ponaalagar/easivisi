@@ -25,6 +25,25 @@ EasiVisi is a powerful, user-friendly **Flask web application** that enables use
 
 ---
 
+## 📸 Screenshots
+
+### Dashboard & Dataset Management
+![Dashboard](static/images/Screenshot%202026-01-01%20221029.png)
+
+### Image Annotation Tool
+![Annotation Tool](static/images/Screenshot%202026-01-01%20221123.png)
+
+### Class Label Configuration
+![Class Configuration](static/images/Screenshot%202026-01-01%20221141.png)
+
+### Training Configuration
+![Training Setup](static/images/Screenshot%202026-01-01%20221232.png)
+
+### Object Detection Inference
+![Inference Results](static/images/Screenshot%202026-01-01%20221311.png)
+
+---
+
 ## 🎯 Use Cases
 
 - **Manufacturing Quality Control** — Detect defects, stains, or anomalies in products
