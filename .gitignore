@@ -2,5 +2,5 @@ sample_dataset
 dataset 
 runs
 yolo*
-__pycache__/
+**/__pycache__/
 *.pyc
