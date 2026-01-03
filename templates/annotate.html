@@ -1,4 +1,4 @@
-{% extends "base.html" %}
+﻿{% extends "base.html" %}
 
 {% block title %}Annotate - {{ dataset.name }}{% endblock %}
 
@@ -47,7 +47,7 @@
             <div class="class-list" id="classList">
                 {% for cls in dataset.classes %}
                 <button class="class-btn" data-class-id="{{ loop.index0 }}" data-class-name="{{ cls }}">
-                    <span class="class-color" style="background: hsl({{ loop.index0 * 45 }}, 70%, 50%)"></span>
+                    <span class="class-color" style="background: hsl( {{ loop.index0 * 45 }}, 70%, 50%)"></span>
                     {{ cls }}
                 </button>
                 {% else %}
