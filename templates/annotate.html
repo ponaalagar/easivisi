@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 
 {% block title %}Annotate - {{ dataset.name }}{% endblock %}
 
@@ -107,10 +107,10 @@
                 </button>
             </div>
             <div class="tool-group">
-                <button class="tool-btn" id="prevImage" title="Previous Image (←)">
+                <button class="tool-btn" id="prevImage" title="Previous Image (?)">
                     <i class="fas fa-chevron-left"></i>
                 </button>
-                <button class="tool-btn" id="nextImage" title="Next Image (→)">
+                <button class="tool-btn" id="nextImage" title="Next Image (?)">
                     <i class="fas fa-chevron-right"></i>
                 </button>
             </div>
@@ -131,7 +131,7 @@
         <!-- Keyboard Shortcuts -->
         <div class="shortcuts-help">
             <p><kbd>B</kbd> Box tool | <kbd>S</kbd> Select | <kbd>P</kbd>/<kbd>Space</kbd> Pan | <kbd>Del</kbd> Delete |
-                <kbd>←→</kbd> Navigate |
+                <kbd>??</kbd> Navigate |
                 <kbd>Ctrl+S</kbd> Save
             </p>
         </div>
@@ -145,7 +145,7 @@
     const datasetName = "{{ dataset.name }}";
     const classes = [
         {% for cls in dataset.classes %}
-    { id: { { loop.index0 } }, name: "{{ cls }}", color: `hsl({{ loop.index0 * 45 }}, 70%, 50%)` },
+    { id: {{ loop.index0 }}, name: "{{ cls }}", color: `hsl({{ loop.index0 * 45 }}, 70%, 50%)` },
     {% endfor %}
     ];
 
@@ -169,7 +169,7 @@
             annotatedCount = data.annotated || 0;
             totalCount = data.total || images.length;
             updateProgressStats();
-            renderImageList();
+            renderImageList(true);  // Force full render on initial load
 
             // Check for image in URL
             const urlParams = new URLSearchParams(window.location.search);
@@ -198,13 +198,31 @@
         document.getElementById('remainingCount').textContent = totalCount - annotatedCount;
     }
 
-    function renderImageList() {
+    function renderImageList(forceRender = false) {
         const list = document.getElementById('imageList');
         if (images.length === 0) {
             list.innerHTML = '<p class="help-text">No images in dataset</p>';
             return;
         }
 
+        // If list is already populated, just update active states
+        const existingItems = list.querySelectorAll('.image-item');
+        if (existingItems.length === images.length && !forceRender) {
+            existingItems.forEach((item, i) => {
+                item.classList.toggle('active', i === currentIndex);
+                item.classList.toggle('annotated', images[i].annotated);
+                // Update the annotation badge if needed
+                const badge = item.querySelector('.annotation-badge');
+                if (images[i].annotated && !badge) {
+                    item.insertAdjacentHTML('beforeend', '<i class="fas fa-check-circle annotation-badge"></i>');
+                } else if (!images[i].annotated && badge) {
+                    badge.remove();
+                }
+            });
+            return;
+        }
+
+        // Full render only when necessary
         list.innerHTML = images.map((img, i) => `
             <div class="image-item ${i === currentIndex ? 'active' : ''} ${img.annotated ? 'annotated' : ''}" data-index="${i}">
                 <img src="/dataset/${datasetName}/image/${img.path}" alt="${img.name}" loading="lazy">
