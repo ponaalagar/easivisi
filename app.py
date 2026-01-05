@@ -25,6 +25,11 @@ from utils.training import (
 from utils.inference import (
     detect_from_bytes, draw_predictions_bytes, list_available_models
 )
+from utils.export import (
+    start_export, get_export_status, list_export_jobs,
+    get_exported_models, get_available_formats, check_dependencies,
+    EXPORT_FORMATS
+)
 
 
 app = Flask(__name__)
@@ -455,6 +460,138 @@ def api_list_models():
     models = list_available_models(Config.MODELS_DIR, Config.RUNS_DIR)
     logger.info(f"Listed {len(models)} available models.")
     return jsonify({'models': models})
+
+
+# ===================
+# API Routes - Export
+# ===================
+
+@app.route('/api/export/formats')
+def api_export_formats():
+    """Get available export formats."""
+    formats = get_available_formats()
+    logger.info(f"Listed {len(formats)} export formats.")
+    return jsonify({'formats': formats})
+
+
+@app.route('/api/export/start', methods=['POST'])
+def api_start_export():
+    """Start a model export job."""
+    data = request.get_json()
+    
+    model_path = data.get('model_path')
+    export_format = data.get('format')
+    
+    if not model_path:
+        logger.warning("Export failed: model_path is required.")
+        return jsonify({'error': 'Model path is required'}), 400
+    
+    if not export_format:
+        logger.warning("Export failed: format is required.")
+        return jsonify({'error': 'Export format is required'}), 400
+    
+    if export_format not in EXPORT_FORMATS:
+        logger.warning(f"Export failed: unsupported format {export_format}.")
+        return jsonify({'error': f'Unsupported format: {export_format}'}), 400
+    
+    # Check dependencies
+    issues = check_dependencies(export_format)
+    if issues:
+        logger.warning(f"Export failed: dependency issues for {export_format}: {issues}")
+        return jsonify({'error': 'Missing dependencies', 'issues': issues}), 400
+    
+    # Build options from request
+    options = {}
+    if 'imgsz' in data:
+        options['imgsz'] = int(data['imgsz'])
+    if 'half' in data:
+        options['half'] = bool(data['half'])
+    if 'dynamic' in data:
+        options['dynamic'] = bool(data['dynamic'])
+    if 'simplify' in data:
+        options['simplify'] = bool(data['simplify'])
+    if 'opset' in data:
+        options['opset'] = int(data['opset'])
+    
+    try:
+        job_id = start_export(model_path, export_format, options)
+        logger.info(f"Started export job {job_id}: {model_path} -> {export_format}")
+        return jsonify({'success': True, 'job_id': job_id})
+    except FileNotFoundError as e:
+        logger.error(f"Export failed - model not found: {e}")
+        return jsonify({'error': str(e)}), 404
+    except Exception as e:
+        logger.error(f"Error starting export: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/export/status/<job_id>')
+def api_export_status(job_id):
+    """Get export job status."""
+    status = get_export_status(job_id)
+    if status:
+        return jsonify(status)
+    logger.warning(f"Export job status not found: {job_id}")
+    return jsonify({'error': 'Job not found'}), 404
+
+
+@app.route('/api/export/jobs')
+def api_list_export_jobs():
+    """List all export jobs."""
+    jobs = list_export_jobs()
+    logger.info(f"Listed {len(jobs)} export jobs.")
+    return jsonify({'jobs': jobs})
+
+
+@app.route('/api/export/download/<job_id>')
+def api_download_exported_model(job_id):
+    """Download an exported model."""
+    status = get_export_status(job_id)
+    
+    if not status:
+        logger.warning(f"Export job not found for download: {job_id}")
+        return jsonify({'error': 'Export job not found'}), 404
+    
+    if status['status'] != 'completed':
+        logger.warning(f"Export job not completed: {job_id}")
+        return jsonify({'error': 'Export not completed'}), 400
+    
+    output_path = status.get('output_path')
+    if not output_path or not os.path.exists(output_path):
+        logger.warning(f"Exported file not found: {output_path}")
+        return jsonify({'error': 'Exported file not found'}), 404
+    
+    directory = os.path.dirname(output_path)
+    filename = os.path.basename(output_path)
+    logger.info(f"Downloading exported model: {filename}")
+    return send_from_directory(directory, filename, as_attachment=True)
+
+
+@app.route('/api/runs/<path:run_path>/exports')
+def api_run_exports(run_path):
+    """Get exported models for a training run."""
+    full_path = os.path.join(Config.RUNS_DIR, run_path, 'weights')
+    if os.path.exists(full_path):
+        exports = get_exported_models(full_path)
+        logger.info(f"Found {len(exports)} exports for run: {run_path}")
+        return jsonify({'exports': exports})
+    logger.warning(f"Weights directory not found for run: {run_path}")
+    return jsonify({'exports': []})
+
+
+@app.route('/api/runs/<path:run_path>/download/<filename>')
+def api_download_run_file(run_path, filename):
+    """Download a file from a training run."""
+    # Sanitize filename to prevent directory traversal
+    filename = secure_filename(filename)
+    weights_path = os.path.join(Config.RUNS_DIR, run_path, 'weights')
+    
+    if os.path.exists(os.path.join(weights_path, filename)):
+        logger.info(f"Downloading {filename} from run {run_path}")
+        return send_from_directory(weights_path, filename, as_attachment=True)
+    
+    logger.warning(f"File not found: {filename} in run {run_path}")
+    return jsonify({'error': 'File not found'}), 404
 
 
 # ===================

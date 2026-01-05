@@ -19,7 +19,7 @@ class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'easivisi-dev-key-change-in-prod')
     MAX_CONTENT_LENGTH = 100 * 1024 * 1024  # 100 MB max upload
     ALLOWED_IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'bmp', 'webp'}
-    ALLOWED_MODEL_EXTENSIONS = {'pt', 'onnx'}
+    ALLOWED_MODEL_EXTENSIONS = {'pt', 'onnx', 'engine', 'tflite', 'torchscript', 'mlpackage'}
     
     # Dataset paths
     DATASET_DIR = DATASET_DIR
@@ -33,6 +33,10 @@ class Config:
     DEFAULT_BATCH_SIZE = 16
     DEFAULT_IMG_SIZE = 640
     DEFAULT_DEVICE = 'cpu'
+    
+    # Export defaults
+    DEFAULT_EXPORT_IMGSZ = 640
+    DEFAULT_EXPORT_OPSET = 17
     
     # Available YOLO models
     YOLO_MODELS = {

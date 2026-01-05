@@ -156,29 +156,46 @@ def list_runs(runs_dir):
     if not os.path.exists(runs_dir):
         return runs
     
-    for project in os.listdir(runs_dir):
-        project_path = os.path.join(runs_dir, project)
-        if os.path.isdir(project_path):
-            for run in os.listdir(project_path):
-                run_path = os.path.join(project_path, run)
-                if os.path.isdir(run_path):
-                    run_info = {
-                        'name': run,
-                        'project': project,
-                        'path': run_path,
-                        'has_weights': os.path.exists(os.path.join(run_path, 'weights', 'best.pt')),
-                        'has_results': os.path.exists(os.path.join(run_path, 'results.csv'))
-                    }
-                    
-                    # Get creation time
-                    try:
-                        run_info['created'] = datetime.fromtimestamp(
-                            os.path.getctime(run_path)
-                        ).isoformat()
-                    except Exception:
-                        pass
-                    
-                    runs.append(run_info)
+    for item in os.listdir(runs_dir):
+        item_path = os.path.join(runs_dir, item)
+        if os.path.isdir(item_path):
+            # Check if this directory contains weights directly (single-level structure)
+            weights_path_direct = os.path.join(item_path, 'weights', 'best.pt')
+            if os.path.exists(weights_path_direct):
+                # Single-level: runs/run_name/weights/best.pt
+                run_info = {
+                    'name': item,
+                    'project': 'runs',
+                    'path': item_path,
+                    'has_weights': True,
+                    'has_results': os.path.exists(os.path.join(item_path, 'results.csv'))
+                }
+                try:
+                    run_info['created'] = datetime.fromtimestamp(
+                        os.path.getctime(item_path)
+                    ).isoformat()
+                except Exception:
+                    pass
+                runs.append(run_info)
+            else:
+                # Check for two-level structure: runs/project/run/weights/best.pt
+                for run in os.listdir(item_path):
+                    run_path = os.path.join(item_path, run)
+                    if os.path.isdir(run_path):
+                        run_info = {
+                            'name': run,
+                            'project': item,
+                            'path': run_path,
+                            'has_weights': os.path.exists(os.path.join(run_path, 'weights', 'best.pt')),
+                            'has_results': os.path.exists(os.path.join(run_path, 'results.csv'))
+                        }
+                        try:
+                            run_info['created'] = datetime.fromtimestamp(
+                                os.path.getctime(run_path)
+                            ).isoformat()
+                        except Exception:
+                            pass
+                        runs.append(run_info)
     
     # Sort by creation time (newest first)
     runs.sort(key=lambda x: x.get('created', ''), reverse=True)

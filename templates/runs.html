@@ -6,7 +6,7 @@
 <div class="page-header">
     <div class="container">
         <h1><i class="fas fa-history"></i> Training Runs</h1>
-        <p>View your training history and download models</p>
+        <p>View your training history, download models, and export to different formats</p>
     </div>
 </div>
 
@@ -45,12 +45,16 @@
 
                     <div class="run-actions">
                         {% if run.has_weights %}
-                        <a href="/dataset/{{ run.project }}/{{ run.name }}/weights/best.pt"
-                            class="btn btn-sm btn-primary" download>
-                            <i class="fas fa-download"></i> Download best.pt
-                        </a>
-                        {% endif %}
+                        <button class="btn btn-sm btn-primary"
+                            onclick="showExportModal('{{ run.project }}/{{ run.name }}')">
+                            <i class="fas fa-file-export"></i> Export
+                        </button>
                         <button class="btn btn-sm btn-secondary"
+                            onclick="downloadWeight('{{ run.project }}/{{ run.name }}', 'best.pt')">
+                            <i class="fas fa-download"></i> Download .pt
+                        </button>
+                        {% endif %}
+                        <button class="btn btn-sm btn-outline"
                             onclick="showRunDetails('{{ run.project }}/{{ run.name }}')">
                             <i class="fas fa-info-circle"></i> Details
                         </button>
@@ -59,6 +63,90 @@
                 {% endfor %}
             </div>
             {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal" id="exportModal">
+    <div class="modal-content modal-lg">
+        <div class="modal-header">
+            <h2><i class="fas fa-file-export"></i> Export Model</h2>
+            <button class="modal-close" onclick="closeExportModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="export-run-info">
+                <span class="label">Model:</span>
+                <span id="exportRunName" class="value"></span>
+            </div>
+
+            <h3>Select Export Format</h3>
+            <div class="export-formats-grid" id="exportFormatsGrid">
+                <div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading formats...</div>
+            </div>
+
+            <div class="export-options" id="exportOptions" style="display: none;">
+                <h3>Export Options</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="exportImgsz">Image Size</label>
+                        <input type="number" id="exportImgsz" value="640" min="320" max="1280" step="32">
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="exportHalf">
+                            <span>Half Precision (FP16)</span>
+                        </label>
+                    </div>
+                    <div class="form-group onnx-option" style="display: none;">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="exportDynamic">
+                            <span>Dynamic Axes</span>
+                        </label>
+                    </div>
+                    <div class="form-group onnx-option" style="display: none;">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="exportSimplify" checked>
+                            <span>Simplify ONNX</span>
+                        </label>
+                    </div>
+                    <div class="form-group onnx-option" style="display: none;">
+                        <label for="exportOpset">ONNX Opset Version</label>
+                        <input type="number" id="exportOpset" value="17" min="11" max="21">
+                    </div>
+                </div>
+            </div>
+
+            <div class="export-progress" id="exportProgress" style="display: none;">
+                <h3><i class="fas fa-cog fa-spin"></i> Exporting...</h3>
+                <div class="progress-bar-container">
+                    <div class="progress-bar" id="exportProgressBar" style="width: 0%"></div>
+                </div>
+                <p id="exportProgressText">Starting export...</p>
+            </div>
+
+            <div class="export-result" id="exportResult" style="display: none;">
+                <div class="export-success">
+                    <i class="fas fa-check-circle"></i>
+                    <h3>Export Complete!</h3>
+                    <p id="exportResultInfo"></p>
+                    <button class="btn btn-primary" id="downloadExportBtn">
+                        <i class="fas fa-download"></i> Download Exported Model
+                    </button>
+                </div>
+            </div>
+
+            <div class="export-error" id="exportError" style="display: none;">
+                <i class="fas fa-exclamation-triangle"></i>
+                <h3>Export Failed</h3>
+                <p id="exportErrorText"></p>
+            </div>
+        </div>
+        <div class="modal-footer" id="exportModalFooter">
+            <button class="btn btn-secondary" onclick="closeExportModal()">Cancel</button>
+            <button class="btn btn-primary" id="startExportBtn" disabled>
+                <i class="fas fa-rocket"></i> Start Export
+            </button>
         </div>
     </div>
 </div>
@@ -78,7 +166,406 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+    .export-formats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 1rem;
+        margin: 1.5rem 0;
+    }
+
+    .format-card {
+        background: var(--bg-secondary);
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        padding: 1.25rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+
+    .format-card:hover {
+        border-color: var(--primary);
+        transform: translateY(-2px);
+    }
+
+    .format-card.selected {
+        border-color: var(--primary);
+        background: linear-gradient(135deg, rgba(99, 102, 241, 0.1), rgba(139, 92, 246, 0.1));
+    }
+
+    .format-card.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .format-card .format-icon {
+        font-size: 2rem;
+        color: var(--primary);
+        margin-bottom: 0.75rem;
+    }
+
+    .format-card .format-name {
+        font-weight: 600;
+        font-size: 1.1rem;
+        margin-bottom: 0.25rem;
+    }
+
+    .format-card .format-desc {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+    }
+
+    .format-card .gpu-badge {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: var(--warning);
+        color: #000;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+        font-weight: 600;
+    }
+
+    .format-card .unavailable-badge {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background: var(--danger);
+        color: #fff;
+        padding: 0.2rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.7rem;
+    }
+
+    .export-run-info {
+        background: var(--bg-tertiary);
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .export-run-info .label {
+        color: var(--text-secondary);
+    }
+
+    .export-run-info .value {
+        font-weight: 600;
+        color: var(--primary);
+    }
+
+    .export-options {
+        background: var(--bg-tertiary);
+        padding: 1.5rem;
+        border-radius: 12px;
+        margin-top: 1.5rem;
+    }
+
+    .export-options h3 {
+        margin-top: 0;
+        margin-bottom: 1rem;
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+        gap: 1rem;
+    }
+
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        cursor: pointer;
+    }
+
+    .checkbox-label input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: var(--primary);
+    }
+
+    .export-progress {
+        text-align: center;
+        padding: 2rem;
+    }
+
+    .export-progress h3 {
+        color: var(--primary);
+        margin-bottom: 1.5rem;
+    }
+
+    .progress-bar-container {
+        background: var(--bg-tertiary);
+        border-radius: 10px;
+        height: 12px;
+        overflow: hidden;
+        margin-bottom: 1rem;
+    }
+
+    .progress-bar {
+        height: 100%;
+        background: linear-gradient(90deg, var(--primary), var(--secondary));
+        border-radius: 10px;
+        transition: width 0.3s ease;
+    }
+
+    .export-result,
+    .export-error {
+        text-align: center;
+        padding: 2rem;
+    }
+
+    .export-success i {
+        font-size: 4rem;
+        color: var(--success);
+        margin-bottom: 1rem;
+    }
+
+    .export-error i {
+        font-size: 4rem;
+        color: var(--danger);
+        margin-bottom: 1rem;
+    }
+
+    .modal-lg {
+        max-width: 700px;
+    }
+
+    .modal-footer {
+        display: flex;
+        justify-content: flex-end;
+        gap: 1rem;
+        padding: 1rem 1.5rem;
+        border-top: 1px solid var(--border-color);
+    }
+
+    /* Exported models list */
+    .exports-list {
+        margin-top: 1rem;
+    }
+
+    .export-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem;
+        background: var(--bg-tertiary);
+        border-radius: 8px;
+        margin-bottom: 0.5rem;
+    }
+
+    .export-item-info {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .export-item-icon {
+        color: var(--primary);
+        font-size: 1.25rem;
+    }
+
+    .export-item-name {
+        font-weight: 500;
+    }
+
+    .export-item-size {
+        color: var(--text-secondary);
+        font-size: 0.85rem;
+    }
+</style>
+
 <script>
+    let currentRunPath = '';
+    let selectedFormat = null;
+    let exportFormats = [];
+    let exportJobId = null;
+    let exportPollInterval = null;
+
+    // Load export formats on page load
+    document.addEventListener('DOMContentLoaded', loadExportFormats);
+
+    async function loadExportFormats() {
+        try {
+            const data = await apiCall('/api/export/formats');
+            exportFormats = data.formats;
+        } catch (error) {
+            console.error('Failed to load export formats:', error);
+        }
+    }
+
+    function showExportModal(runPath) {
+        currentRunPath = runPath;
+        selectedFormat = null;
+        exportJobId = null;
+
+        // Reset UI
+        document.getElementById('exportRunName').textContent = runPath;
+        document.getElementById('exportOptions').style.display = 'none';
+        document.getElementById('exportProgress').style.display = 'none';
+        document.getElementById('exportResult').style.display = 'none';
+        document.getElementById('exportError').style.display = 'none';
+        document.getElementById('exportModalFooter').style.display = 'flex';
+        document.getElementById('startExportBtn').disabled = true;
+
+        // Render formats
+        renderExportFormats();
+
+        document.getElementById('exportModal').classList.add('active');
+    }
+
+    function renderExportFormats() {
+        const grid = document.getElementById('exportFormatsGrid');
+
+        if (exportFormats.length === 0) {
+            grid.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading formats...</div>';
+            return;
+        }
+
+        grid.innerHTML = exportFormats.map(fmt => `
+            <div class="format-card ${!fmt.available ? 'disabled' : ''}" 
+                 data-format="${fmt.id}"
+                 onclick="${fmt.available ? `selectFormat('${fmt.id}')` : ''}">
+                ${fmt.requires_gpu ? '<span class="gpu-badge">GPU Required</span>' : ''}
+                ${!fmt.available ? '<span class="unavailable-badge">Unavailable</span>' : ''}
+                <div class="format-icon"><i class="fas ${fmt.icon}"></i></div>
+                <div class="format-name">${fmt.name}</div>
+                <div class="format-desc">${fmt.description}</div>
+            </div>
+        `).join('');
+    }
+
+    function selectFormat(formatId) {
+        selectedFormat = formatId;
+
+        // Update selection UI
+        document.querySelectorAll('.format-card').forEach(card => {
+            card.classList.toggle('selected', card.dataset.format === formatId);
+        });
+
+        // Show options
+        document.getElementById('exportOptions').style.display = 'block';
+
+        // Show/hide ONNX-specific options
+        const isOnnx = formatId === 'onnx';
+        document.querySelectorAll('.onnx-option').forEach(el => {
+            el.style.display = isOnnx ? 'block' : 'none';
+        });
+
+        // Enable start button
+        document.getElementById('startExportBtn').disabled = false;
+    }
+
+    document.getElementById('startExportBtn').addEventListener('click', startExport);
+
+    async function startExport() {
+        if (!selectedFormat || !currentRunPath) return;
+
+        const modelPath = `runs/${currentRunPath}/weights/best.pt`;
+
+        const options = {
+            model_path: modelPath,
+            format: selectedFormat,
+            imgsz: parseInt(document.getElementById('exportImgsz').value)
+        };
+
+        if (document.getElementById('exportHalf').checked) {
+            options.half = true;
+        }
+
+        if (selectedFormat === 'onnx') {
+            if (document.getElementById('exportDynamic').checked) {
+                options.dynamic = true;
+            }
+            options.simplify = document.getElementById('exportSimplify').checked;
+            options.opset = parseInt(document.getElementById('exportOpset').value);
+        }
+
+        // Show progress UI
+        document.getElementById('exportOptions').style.display = 'none';
+        document.getElementById('exportFormatsGrid').style.display = 'none';
+        document.querySelector('.export-run-info').style.display = 'none';
+        document.querySelectorAll('.modal-body h3').forEach(h => h.style.display = 'none');
+        document.getElementById('exportProgress').style.display = 'block';
+        document.getElementById('exportModalFooter').style.display = 'none';
+
+        try {
+            const data = await apiCall('/api/export/start', {
+                method: 'POST',
+                body: JSON.stringify(options)
+            });
+
+            exportJobId = data.job_id;
+            pollExportStatus();
+
+        } catch (error) {
+            showExportError(error.message);
+        }
+    }
+
+    function pollExportStatus() {
+        exportPollInterval = setInterval(async () => {
+            try {
+                const status = await apiCall(`/api/export/status/${exportJobId}`);
+
+                // Update progress
+                document.getElementById('exportProgressBar').style.width = status.progress + '%';
+                document.getElementById('exportProgressText').textContent =
+                    `Progress: ${status.progress}% - ${status.status}`;
+
+                if (status.status === 'completed') {
+                    clearInterval(exportPollInterval);
+                    showExportSuccess(status);
+                } else if (status.status === 'failed') {
+                    clearInterval(exportPollInterval);
+                    showExportError(status.error || 'Export failed');
+                }
+            } catch (error) {
+                clearInterval(exportPollInterval);
+                showExportError(error.message);
+            }
+        }, 1000);
+    }
+
+    function showExportSuccess(status) {
+        document.getElementById('exportProgress').style.display = 'none';
+        document.getElementById('exportResult').style.display = 'block';
+
+        const sizeMB = status.output_size ? (status.output_size / 1024 / 1024).toFixed(2) : 'Unknown';
+        document.getElementById('exportResultInfo').textContent =
+            `Exported to ${status.format_info?.name || status.export_format} (${sizeMB} MB)`;
+
+        document.getElementById('downloadExportBtn').onclick = () => {
+            window.location.href = `/api/export/download/${exportJobId}`;
+        };
+    }
+
+    function showExportError(message) {
+        document.getElementById('exportProgress').style.display = 'none';
+        document.getElementById('exportError').style.display = 'block';
+        document.getElementById('exportErrorText').textContent = message;
+    }
+
+    function closeExportModal() {
+        if (exportPollInterval) {
+            clearInterval(exportPollInterval);
+        }
+        document.getElementById('exportModal').classList.remove('active');
+
+        // Reset display states
+        document.querySelector('.export-run-info').style.display = 'flex';
+        document.getElementById('exportFormatsGrid').style.display = 'grid';
+        document.querySelectorAll('.modal-body h3').forEach(h => h.style.display = 'block');
+    }
+
+    async function downloadWeight(runPath, filename) {
+        window.location.href = `/api/runs/${runPath}/download/${filename}`;
+    }
+
     async function showRunDetails(runPath) {
         document.getElementById('detailsModal').classList.add('active');
         document.getElementById('modalTitle').textContent = runPath;
@@ -87,28 +574,58 @@
         body.innerHTML = '<div class="loading"><i class="fas fa-spinner fa-spin"></i> Loading...</div>';
 
         try {
-            const data = await apiCall(`/api/runs/${runPath}`);
+            const [details, exportsData] = await Promise.all([
+                apiCall(`/api/runs/${runPath}`),
+                apiCall(`/api/runs/${runPath}/exports`)
+            ]);
 
             let html = '<div class="run-details">';
 
             // Weights
-            if (Object.keys(data.weights).length > 0) {
+            if (Object.keys(details.weights).length > 0) {
                 html += '<h3>Weights</h3><ul>';
-                for (const [name, info] of Object.entries(data.weights)) {
+                for (const [name, info] of Object.entries(details.weights)) {
                     const sizeMB = (info.size / 1024 / 1024).toFixed(2);
-                    html += `<li><strong>${name}</strong> (${sizeMB} MB)</li>`;
+                    html += `<li><strong>${name}</strong> (${sizeMB} MB) 
+                        <button class="btn btn-sm btn-primary" onclick="downloadWeight('${runPath}', '${name}')">
+                            <i class="fas fa-download"></i>
+                        </button>
+                    </li>`;
                 }
                 html += '</ul>';
             }
 
+            // Exported models
+            if (exportsData.exports && exportsData.exports.length > 0) {
+                html += '<h3>Exported Models</h3><div class="exports-list">';
+                for (const exp of exportsData.exports) {
+                    const sizeMB = (exp.size / 1024 / 1024).toFixed(2);
+                    html += `
+                        <div class="export-item">
+                            <div class="export-item-info">
+                                <i class="fas ${exp.icon} export-item-icon"></i>
+                                <div>
+                                    <div class="export-item-name">${exp.filename}</div>
+                                    <div class="export-item-size">${exp.format_name} - ${sizeMB} MB</div>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="downloadWeight('${runPath}', '${exp.filename}')">
+                                <i class="fas fa-download"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+            }
+
             // Training args
-            if (data.args) {
-                html += '<h3>Training Arguments</h3><pre>' + JSON.stringify(data.args, null, 2) + '</pre>';
+            if (details.args) {
+                html += '<h3>Training Arguments</h3><pre>' + JSON.stringify(details.args, null, 2) + '</pre>';
             }
 
             // Results summary
-            if (data.results && data.results.length > 0) {
-                const lastResult = data.results[data.results.length - 1];
+            if (details.results && details.results.length > 0) {
+                const lastResult = details.results[details.results.length - 1];
                 html += '<h3>Final Metrics</h3><ul>';
                 for (const [key, value] of Object.entries(lastResult)) {
                     if (typeof value === 'number') {
@@ -130,14 +647,22 @@
         document.getElementById('detailsModal').classList.remove('active');
     }
 
-    // Close on outside click
-    document.getElementById('detailsModal').addEventListener('click', (e) => {
-        if (e.target.id === 'detailsModal') closeModal();
+    // Close modals on outside click
+    ['exportModal', 'detailsModal'].forEach(modalId => {
+        document.getElementById(modalId).addEventListener('click', (e) => {
+            if (e.target.id === modalId) {
+                if (modalId === 'exportModal') closeExportModal();
+                else closeModal();
+            }
+        });
     });
 
     // Close on escape
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeModal();
+        if (e.key === 'Escape') {
+            closeExportModal();
+            closeModal();
+        }
     });
 </script>
 {% endblock %}
