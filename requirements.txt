@@ -3,7 +3,7 @@ torch==2.9.1
 torchvision==0.24.1
 
 # YOLO framework
-ultralytics==8.3.235
+ultralytics==8.4.2
 ultralytics-thop==2.0.18   # model profiling helper
 
 # Image processing
