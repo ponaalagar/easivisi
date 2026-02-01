@@ -340,7 +340,8 @@
         justify-content: flex-end;
         gap: 1rem;
         padding: 1rem 1.5rem;
-        border-top: 1px solid var(--border-color);
+        border-top: 1px solid var(--border);
+        background: var(--bg-secondary);
     }
 
     /* Exported models list */
@@ -465,7 +466,8 @@
     async function startExport() {
         if (!selectedFormat || !currentRunPath) return;
 
-        const modelPath = `runs/${currentRunPath}/weights/best.pt`;
+        // currentRunPath includes project/name (e.g., "runs/testing_v25" for single-level runs)
+        const modelPath = `${currentRunPath}/weights/best.pt`;
 
         const options = {
             model_path: modelPath,
