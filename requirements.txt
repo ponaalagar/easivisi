@@ -1,6 +1,7 @@
-# Core deep learning
-torch>=2.0.0
-torchvision>=0.15.0
+# Core deep learning (CPU Optimized for speed and portability)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
 
 # YOLO framework
 ultralytics>=8.3.0

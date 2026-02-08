@@ -1,0 +1,36 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Jupyter/Data info
+.ipynb_checkpoints
+
+# VS Code
+.vscode/
+
+# Project specific
+# We generally don't want to copy huge datasets or previous runs into the generic image
+# unless checking them in is intended. Usually these are mounted as volumes.
+dataset/
+runs/
+runs_stain/
+models/
+uploads/
+*.pt
+*.onnx
+*.engine
+
+# System
+.DS_Store
+Thumbs.db
