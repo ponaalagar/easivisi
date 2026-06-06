@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container" style="padding-top: var(--space-8); padding-bottom: var(--space-8);">
+    <div class="profile-header card animate-fadeInUp">
+        <div class="card-header">
+            <h1><i class="fas fa-user-circle"></i> My Profile</h1>
+        </div>
+        <div class="card-body">
+            <div class="profile-info">
+                <p><strong>Username:</strong> {{ user.username }}</p>
+                <p><strong>Email:</strong> {{ user.email }}</p>
+                <p><strong>Full Name:</strong> {{ user.full_name or 'Not set' }}</p>
+                <p><strong>Role:</strong> <span class="badge badge-{{ 'error' if user.role == 'admin' else 'info' }}">{{
+                        user.role.title() }}</span></p>
+                <p><strong>Member Since:</strong> {{ user.created_at.strftime('%B %d, %Y') if user.created_at else
+                    'Unknown' }}</p>
+                <p><strong>Last Login:</strong> {{ user.last_login.strftime('%B %d, %Y %I:%M %p') if user.last_login
+                    else 'Never' }}</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="card animate-fadeInUp" style="animation-delay: 0.1s; margin-top: var(--space-6);">
+        <div class="card-header">
+            <h2><i class="fas fa-edit"></i> Update Profile</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="/auth/profile/update">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <input type="text" name="full_name" class="form-input" value="{{ user.full_name or '' }}">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Bio</label>
+                    <textarea name="bio" class="form-textarea" rows="4"
+                        placeholder="Tell us about yourself">{{ user.bio or '' }}</textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Changes
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div class="card animate-fadeInUp" style="animation-delay: 0.2s; margin-top: var(--space-6);">
+        <div class="card-header">
+            <h2><i class="fas fa-lock"></i> Change Password</h2>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="/auth/password/change">
+                <div class="form-group">
+                    <label class="form-label">Current Password</label>
+                    <input type="password" name="current_password" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">New Password</label>
+                    <input type="password" name="new_password" class="form-input" required>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Confirm New Password</label>
+                    <input type="password" name="confirm_password" class="form-input" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-key"></i> Change Password
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<style>
+    .profile-info p {
+        margin-bottom: var(--space-3);
+        color: var(--text-secondary);
+    }
+
+    .profile-info strong {
+        color: var(--text-primary);
+        display: inline-block;
+        min-width: 120px;
+    }
+</style>
+{% endblock %}

@@ -3,10 +3,15 @@ EasiVisi - Training Utilities
 """
 import os
 import json
+import logging
 import threading
 import time
+import traceback
 from datetime import datetime
 from pathlib import Path
+
+# Configure logger for training module
+logger = logging.getLogger("EasiVisi.Training")
 
 # Global training state
 _training_jobs = {}
@@ -49,6 +54,8 @@ class TrainingJob:
 
 def _run_training(job):
     """Run the training in a background thread."""
+    logger.info(f"Training thread started for job {job.job_id}")
+    
     try:
         from ultralytics import YOLO
         
@@ -57,7 +64,9 @@ def _run_training(job):
         
         # Load model
         model_name = job.config.get('model', 'yolov8n.pt')
+        logger.info(f"[{job.job_id}] Loading model: {model_name}")
         model = YOLO(model_name)
+        logger.info(f"[{job.job_id}] Model loaded successfully")
         
         # Prepare training arguments
         train_args = {
@@ -73,9 +82,15 @@ def _run_training(job):
             'verbose': True
         }
         
+        logger.info(f"[{job.job_id}] Training config: epochs={train_args['epochs']}, "
+                   f"imgsz={train_args['imgsz']}, batch={train_args['batch']}, "
+                   f"device={train_args['device']}")
+        logger.info(f"[{job.job_id}] Using dataset: {train_args['data']}")
+        
         # Custom callback to update progress
         def on_train_epoch_end(trainer):
             if job._stop_flag:
+                logger.info(f"[{job.job_id}] Stop flag detected, interrupting training")
                 raise KeyboardInterrupt("Training stopped by user")
             job.current_epoch = trainer.epoch + 1
             job.progress = int((job.current_epoch / job.total_epochs) * 100)
@@ -86,29 +101,42 @@ def _run_training(job):
                     'box_loss': float(trainer.loss_items[0]) if trainer.loss_items is not None else 0,
                     'cls_loss': float(trainer.loss_items[1]) if trainer.loss_items is not None else 0,
                 }
+            
+            logger.info(f"[{job.job_id}] Epoch {job.current_epoch}/{job.total_epochs} completed ({job.progress}%)")
         
         model.add_callback('on_train_epoch_end', on_train_epoch_end)
         
         # Run training
+        logger.info(f"[{job.job_id}] Starting training...")
         results = model.train(**train_args)
         
         job.save_dir = str(results.save_dir)
         job.status = 'completed'
         job.progress = 100
         
+        logger.info(f"[{job.job_id}] Training completed successfully! Results saved to: {job.save_dir}")
+        
     except KeyboardInterrupt:
         job.status = 'stopped'
         job.error = 'Training stopped by user'
+        logger.info(f"[{job.job_id}] Training stopped by user")
     except Exception as e:
         job.status = 'failed'
         job.error = str(e)
+        logger.error(f"[{job.job_id}] Training failed with error: {e}")
+        logger.error(f"[{job.job_id}] Traceback: {traceback.format_exc()}")
     finally:
         job.end_time = datetime.now()
+        duration = (job.end_time - job.start_time).total_seconds() if job.start_time else 0
+        logger.info(f"[{job.job_id}] Training job finished. Status: {job.status}, Duration: {duration:.1f}s")
 
 
 def start_training(config):
     """Start a new training job."""
     job_id = f"job_{int(time.time())}"
+    
+    logger.info(f"Creating training job {job_id}")
+    logger.info(f"Config: dataset_yaml={config.get('data_yaml')}, model={config.get('model')}")
     
     job = TrainingJob(job_id, config)
     
@@ -116,10 +144,15 @@ def start_training(config):
         _training_jobs[job_id] = job
     
     # Start training in background thread
-    thread = threading.Thread(target=_run_training, args=(job,))
-    thread.daemon = True
+    # NOTE: Thread must NOT be daemon if Flask reloader is enabled,
+    # because daemon threads are killed when the main thread exits.
+    # However, we've disabled the reloader by default in app.py to avoid this issue.
+    thread = threading.Thread(target=_run_training, args=(job,), name=f"TrainingThread-{job_id}")
+    thread.daemon = True  # Keep as daemon; Flask reloader is now disabled by default
     job._thread = thread
     thread.start()
+    
+    logger.info(f"Training thread started for job {job_id}")
     
     return job_id
 

@@ -1,18 +1,33 @@
 """
 EasiVisi - Visual AI Training Platform
-Flask Web Application
+Flask Web Application with PostgreSQL & Authentication
 """
 
 import os
 import json
 import logging
 from flask import Flask, render_template, request, jsonify, send_from_directory, redirect, url_for
+from flask_login import LoginManager, current_user, login_required
 from werkzeug.utils import secure_filename
 
+# Configuration
 from config import Config, get_config
+
+# Database
+from database import db, init_db
+
+# Models
+from models.user import User, Dataset, TrainingRun, ModelExport, ActivityLog
+
+# Authentication
+from auth import auth_bp
+from auth.decorators import permission_required, admin_required
+
+# Utilities
 from utils.dataset import (
     create_dataset_structure, split_dataset, generate_dataset_yaml,
-    get_dataset_stats, list_datasets, delete_dataset, validate_image
+    get_dataset_stats, list_datasets, delete_dataset, validate_image,
+    import_labeled_dataset
 )
 from utils.annotation import (
     get_image_with_annotations, save_annotations_for_image,
@@ -27,18 +42,62 @@ from utils.inference import (
 )
 
 
+# ============================================================================
+# APPLICATION SETUP
+# ============================================================================
+
 app = Flask(__name__)
 config = get_config()
 app.config.from_object(config)
 
-# ===================
-# Logging Setup
-# ===================
+# Initialize database
+init_db(app)
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'auth.login'
+login_manager.login_message = 'Please log in to access this page.'
+login_manager.login_message_category = 'info'
+
+@login_manager.user_loader
+def load_user(user_id):
+    """Load user by ID for Flask-Login."""
+    return User.query.get(int(user_id))
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    """Handle unauthorized access."""
+    if request.is_json or request.path.startswith('/api/'):
+        return jsonify({'error': 'Authentication required'}), 401
+    return redirect(url_for('auth.login', next=request.url))
+
+# Register authentication blueprint
+app.register_blueprint(auth_bp)
+
+
+# ============================================================================
+# LOGGING SETUP
+# ============================================================================
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
 )
 logger = logging.getLogger("EasiVisi")
+
+# Suppress noisy log messages from libraries
+logging.getLogger('werkzeug').setLevel(logging.WARNING)
+logging.getLogger('ultralytics').setLevel(logging.INFO)
+
+# List of 404 paths to suppress (noise from browser extensions, etc.)
+_SUPPRESSED_404_PATHS = [
+    '/hybridaction/',
+    '/favicon.ico',
+    '/.well-known/',
+    '/robots.txt',
+    '/sitemap.xml',
+]
 
 
 # ===================
@@ -46,15 +105,19 @@ logger = logging.getLogger("EasiVisi")
 # ===================
 
 def allowed_image(filename):
-    return '.' in filename and \
-           filename.rsplit('.', 1)[1].lower() in Config.ALLOWED_IMAGE_EXTENSIONS
+    """Check if filename has an allowed image extension."""
+    if '.' not in filename:
+        return False
+    ext = '.' + filename.rsplit('.', 1)[1].lower()
+    return ext in Config.ALLOWED_IMAGE_EXTENSIONS
 
 
-# ===================
-# Page Routes
-# ===================
+# ============================================================================
+# PAGE ROUTES (All require authentication)
+# ============================================================================
 
 @app.route('/')
+@login_required
 def index():
     """Landing page."""
     logger.info("Rendering index page.")
@@ -64,6 +127,7 @@ def index():
 
 
 @app.route('/dataset')
+@login_required
 def dataset_page():
     """Dataset management page."""
     logger.info("Rendering dataset management page.")
@@ -72,6 +136,7 @@ def dataset_page():
 
 
 @app.route('/dataset/<dataset_name>')
+@login_required
 def dataset_detail(dataset_name):
     """Dataset detail page."""
     logger.info(f"Rendering detail page for dataset: {dataset_name}")
@@ -83,6 +148,7 @@ def dataset_detail(dataset_name):
 
 
 @app.route('/annotate/<dataset_name>')
+@login_required
 def annotate_page(dataset_name):
     """Annotation tool page."""
     logger.info(f"Rendering annotation tool for dataset: {dataset_name}")
@@ -94,6 +160,7 @@ def annotate_page(dataset_name):
 
 
 @app.route('/train')
+@login_required
 def train_page():
     """Training configuration page."""
     logger.info("Rendering training configuration page.")
@@ -104,6 +171,7 @@ def train_page():
 
 
 @app.route('/inference')
+@login_required
 def inference_page():
     """Inference playground page."""
     logger.info("Rendering inference playground page.")
@@ -112,6 +180,7 @@ def inference_page():
 
 
 @app.route('/runs')
+@login_required
 def runs_page():
     """Training runs history page."""
     logger.info("Rendering training runs history page.")
@@ -276,8 +345,179 @@ def api_delete_dataset(dataset_name):
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/dataset/<dataset_name>/import', methods=['POST'])
+def api_import_labeled_dataset(dataset_name):
+    """
+    Import pre-labeled dataset from ZIP files or directories.
+    
+    Enterprise-grade endpoint with comprehensive validation and error handling.
+    Supports multipart file upload and base64-encoded ZIP files.
+    
+    Expected JSON payload:
+    {
+        "source_type": "zip" or "directory",
+        "images_source": "<base64_zip_data>" or "<directory_path>",
+        "labels_source": "<base64_zip_data>" or "<directory_path>" (optional),
+        "overwrite_existing": true/false,
+        "validate_labels": true/false,
+        "auto_split": true/false,
+        "val_ratio": 0.2
+    }
+    
+    Returns:
+        JSON with import statistics, errors, and warnings
+    """
+    import tempfile
+    import base64
+    
+    logger.info(f"Dataset import request for {dataset_name}")
+    
+    try:
+        # Parse request data
+        if request.is_json:
+            data = request.get_json()
+        else:
+            return jsonify({
+                'error': 'Content-Type must be application/json'
+            }), 400
+        
+        # Extract and validate parameters
+        source_type = data.get('source_type', 'zip')
+        if source_type not in ['zip', 'directory']:
+            return jsonify({
+                'error': f"Invalid source_type: {source_type}. Use 'zip' or 'directory'"
+            }), 400
+        
+        images_source = data.get('images_source')
+        labels_source = data.get('labels_source')
+        
+        if not images_source:
+            return jsonify({'error': 'images_source is required'}), 400
+        
+        # Optional parameters with defaults
+        overwrite_existing = data.get('overwrite_existing', False)
+        validate_labels = data.get('validate_labels', True)
+        auto_split = data.get('auto_split', False)
+        val_ratio = float(data.get('val_ratio', 0.2))
+        
+        # Validate val_ratio
+        if not (0 < val_ratio < 1):
+            return jsonify({'error': 'val_ratio must be between 0 and 1'}), 400
+        
+        # Create temporary files for ZIP data if source_type is 'zip'
+        temp_images_path = None
+        temp_labels_path = None
+        
+        if source_type == 'zip':
+            # Decode base64 and save to temporary files
+            try:
+                # Create temporary directory
+                temp_dir = tempfile.mkdtemp(prefix='easivisi_import_')
+                
+                # Decode images ZIP
+                try:
+                    images_data = base64.b64decode(images_source)
+                    temp_images_path = os.path.join(temp_dir, 'images.zip')
+                    with open(temp_images_path, 'wb') as f:
+                        f.write(images_data)
+                    logger.info(f"Decoded images ZIP: {len(images_data)} bytes")
+                except Exception as e:
+                    logger.error(f"Failed to decode images ZIP: {e}")
+                    return jsonify({
+                        'error': f"Invalid images_source base64 encoding: {str(e)}"
+                    }), 400
+                
+                # Decode labels ZIP if provided
+                if labels_source:
+                    try:
+                        labels_data = base64.b64decode(labels_source)
+                        temp_labels_path = os.path.join(temp_dir, 'labels.zip')
+                        with open(temp_labels_path, 'wb') as f:
+                            f.write(labels_data)
+                        logger.info(f"Decoded labels ZIP: {len(labels_data)} bytes")
+                    except Exception as e:
+                        logger.warning(f"Failed to decode labels ZIP: {e}")
+                        # Continue without labels
+                        temp_labels_path = None
+                
+                # Update source paths to temp files
+                images_source = temp_images_path
+                labels_source = temp_labels_path
+                
+            except Exception as e:
+                logger.exception(f"Error processing ZIP data: {e}")
+                return jsonify({
+                    'error': f"Failed to process ZIP files: {str(e)}"
+                }), 500
+        
+        # Validate dataset exists
+        dataset_stats = get_dataset_stats(dataset_name)
+        if not dataset_stats:
+            return jsonify({
+                'error': f"Dataset '{dataset_name}' not found. Create it first."
+            }), 404
+        
+        # Perform import
+        logger.info(
+            f"Starting import: source_type={source_type}, "
+            f"validate={validate_labels}, auto_split={auto_split}"
+        )
+        
+        result = import_labeled_dataset(
+            dataset_name=dataset_name,
+            images_source=images_source,
+            labels_source=labels_source,
+            source_type=source_type,
+            overwrite_existing=overwrite_existing,
+            validate_labels=validate_labels,
+            auto_split=auto_split,
+            val_ratio=val_ratio
+        )
+        
+        # Clean up temporary files
+        if source_type == 'zip' and temp_images_path:
+            try:
+                import shutil
+                shutil.rmtree(os.path.dirname(temp_images_path))
+                logger.info("Cleaned up temporary files")
+            except Exception as e:
+                logger.warning(f"Failed to clean up temp files: {e}")
+        
+        # Return detailed result
+        response_data = result.to_dict()
+        logger.info(
+            f"Import completed: {response_data['status']}, "
+            f"{response_data['total_images']} images, "
+            f"{len(response_data['errors'])} errors"
+        )
+        
+        # Determine HTTP status code
+        if result.status.value == 'success':
+            status_code = 200
+        elif result.status.value == 'partial_success':
+            status_code = 207  # Multi-Status
+        else:
+            status_code = 500
+        
+        return jsonify(response_data), status_code
+    
+    except ValueError as e:
+        logger.error(f"Validation error: {e}")
+        return jsonify({'error': str(e)}), 400
+    except IOError as e:
+        logger.error(f"IO error: {e}")
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        logger.exception(f"Unexpected error during import: {e}")
+        return jsonify({
+            'error': 'Internal server error during import',
+            'details': str(e)
+        }), 500
+
+
 # ===================
 # API Routes - Annotation
+#
 # ===================
 
 @app.route('/api/annotate/<dataset_name>/<path:image_path>')
@@ -475,7 +715,16 @@ def serve_dataset_image(dataset_name, image_path):
 
 @app.errorhandler(404)
 def not_found(e):
-    logger.warning(f"404 Not Found: {request.path}")
+    # Suppress logging for noisy external requests (browser extensions, bots, etc.)
+    should_log = True
+    for suppressed_prefix in _SUPPRESSED_404_PATHS:
+        if request.path.startswith(suppressed_prefix):
+            should_log = False
+            break
+    
+    if should_log:
+        logger.warning(f"404 Not Found: {request.path}")
+    
     if request.path.startswith('/api/'):
         return jsonify({'error': 'Not found'}), 404
     return render_template('error.html', error='Page not found'), 404
@@ -494,10 +743,32 @@ def server_error(e):
 # ===================
 
 if __name__ == '__main__':
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='EasiVisi - Visual AI Training Platform')
+    parser.add_argument('--debug', action='store_true', help='Run in debug mode')
+    parser.add_argument('--no-reload', action='store_true', default=True, 
+                        help='Disable auto-reload (default: disabled to protect training threads)')
+    parser.add_argument('--host', default='0.0.0.0', help='Host to bind to')
+    parser.add_argument('--port', type=int, default=5000, help='Port to bind to')
+    args = parser.parse_args()
+    
     logger.info("=" * 50)
     logger.info("EasiVisi - Visual AI Training Platform")
     logger.info("=" * 50)
     logger.info(f"Dataset Directory: {Config.DATASET_DIR}")
     logger.info(f"Runs Directory: {Config.RUNS_DIR}")
+    logger.info(f"Debug Mode: {args.debug}")
+    logger.info(f"Auto-Reload: {not args.no_reload}")
     logger.info("=" * 50)
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    
+    # NOTE: use_reloader=False is CRITICAL for training to work properly!
+    # The Flask reloader watches for file changes and restarts the app,
+    # which kills any running training threads. Training creates many files
+    # in the runs directory, so reloader must be disabled during production use.
+    app.run(
+        debug=args.debug, 
+        host=args.host, 
+        port=args.port, 
+        use_reloader=not args.no_reload  # Disabled by default to protect training
+    )

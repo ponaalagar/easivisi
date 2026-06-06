@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="auth-page">
+    <div class="auth-container">
+        <div class="auth-card card animate-scaleIn">
+            <div class="card-header text-center">
+                <h1><i class="fas fa-sign-in-alt"></i> Login to EasiVisi</h1>
+                <p class="text-muted">Train custom YOLO models with ease</p>
+            </div>
+
+            <div class="card-body">
+                <form method="POST" action="/auth/login">
+                    <div class="form-group">
+                        <label class="form-label">Username</label>
+                        <input type="text" name="username" class="form-input" placeholder="Enter your username" required
+                            autofocus>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Password</label>
+                        <input type="password" name="password" class="form-input" placeholder="Enter your password"
+                            required>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" name="remember">
+                            <span>Remember me</span>
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-lg" style="width: 100%;">
+                        <i class="fas fa-sign-in-alt"></i> Login
+                    </button>
+                </form>
+
+                <div class="auth-links" style="margin-top: 1.5rem; text-align: center;">
+                    <p class="text-muted">
+                        Don't have an account?
+                        <a href="/auth/register" style="color: var(--primary-600); font-weight: 500;">Register here</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .auth-page {
+        min-height: calc(100vh - 120px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, var(--primary-50) 0%, var(--accent-50) 100%);
+        padding: var(--space-8) var(--space-4);
+    }
+
+    [data-theme="dark"] .auth-page {
+        background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    }
+
+    .auth-container {
+        width: 100%;
+        max-width: 450px;
+    }
+
+    .auth-card {
+        box-shadow: var(--shadow-xl);
+    }
+
+    .auth-card .card-header {
+        background: linear-gradient(135deg, var(--primary-600) 0%, var(--accent-600) 100%);
+        color: white;
+        padding: var(--space-8);
+        border-bottom: none;
+    }
+
+    .auth-card .card-header h1 {
+        color: white;
+        margin-bottom: var(--space-2);
+        font-size: 1.75rem;
+    }
+
+    .auth-card .card-header p {
+        color: rgba(255, 255, 255, 0.9);
+        margin: 0;
+    }
+
+    .auth-card .card-body {
+        padding: var(--space-8);
+    }
+</style>
+{% endblock %}

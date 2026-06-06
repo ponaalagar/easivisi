@@ -1,23 +1,39 @@
-# Core deep learning
-torch==2.9.1
-torchvision==0.24.1
+# Core deep learning (Python 3.10 compatible)
+torch>=2.0.0
+torchvision>=0.15.0
 
 # YOLO framework
-ultralytics==8.3.235
-ultralytics-thop==2.0.18   # model profiling helper
+ultralytics>=8.0.0
+ultralytics-thop>=2.0.0
 
 # Image processing
-opencv-python==4.11.0.86
-numpy==2.4.0
-pillow==11.3.0
+opencv-python>=4.8.0
+numpy>=1.24.0,<2.0.0  # Python 3.10 compatible
+pillow>=10.0.0
 
 # Visualization & logging
-matplotlib==3.10.8
-seaborn==0.13.2
-tensorboard==2.20.0
+matplotlib>=3.7.0
+seaborn>=0.12.0
+tensorboard>=2.13.0
 
 # Dataset & evaluation
-pyyaml==6.0.3
-pandas==2.3.3
-scikit-learn==1.3.2
-pycocotools==2.0.11   # install separately if COCO evaluation is needed
+pyyaml>=6.0
+pandas>=2.0.0
+scikit-learn>=1.3.0
+pycocotools>=2.0.0
+
+# Web framework
+Flask>=2.3.0
+
+# ============================================================================
+# DATABASE & ORM (PostgreSQL)
+# ============================================================================
+Flask-SQLAlchemy>=3.0.0
+Flask-Migrate>=4.0.0
+psycopg2-binary>=2.9.0
+
+# ============================================================================
+# AUTHENTICATION & SECURITY
+# ============================================================================
+Flask-Login>=0.6.0
+Werkzeug>=2.3.0

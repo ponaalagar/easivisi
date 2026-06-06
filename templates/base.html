@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en" data-theme="dark">
+<html lang="en">
 
 <head>
     <meta charset="UTF-8">
@@ -18,7 +18,9 @@
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="{{ url_for('static', filename='logo/favicon.png') }}">
 
-    <!-- Custom CSS -->
+    <!-- Modern Design System -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/modern.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/animations.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 
     {% block head %}{% endblock %}
@@ -52,9 +54,17 @@
                 </a>
             </div>
 
-            <button class="nav-toggle" id="navToggle">
-                <i class="fas fa-bars"></i>
-            </button>
+            <div class="nav-actions">
+                <!-- Theme Toggle -->
+                <button class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle theme">
+                    <i class="fas fa-sun" id="lightIcon"></i>
+                    <i class="fas fa-moon" id="darkIcon" style="display: none;"></i>
+                </button>
+
+                <button class="nav-toggle" id="navToggle" aria-label="Toggle menu">
+                    <i class="fas fa-bars"></i>
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -68,7 +78,7 @@
     </div>
 
     <!-- Main Content -->
-    <main class="main-content">
+    <main class="main-content animate-fadeInUp">
         {% block content %}{% endblock %}
     </main>
 
@@ -80,54 +90,34 @@
         </div>
     </footer>
 
-    <!-- Toast Container -->
-    <div class="toast-container" id="toastContainer"></div>
+    <!-- Theme Toggle Script (Load First) -->
+    <script src="{{ url_for('static', filename='js/theme.js') }}"></script>
 
     <!-- Common Scripts -->
     <script>
         // Mobile menu toggle
         document.getElementById('navToggle')?.addEventListener('click', () => {
-            document.getElementById('mobileMenu').classList.toggle('active');
+            const mobileMenu = document.getElementById('mobileMenu');
+            mobileMenu.classList.toggle('active');
+
+            // Update icon
+            const icon = document.querySelector('#navToggle i');
+            icon.classList.toggle('fa-bars');
+            icon.classList.toggle('fa-times');
         });
 
-        // Toast notification function
-        function showToast(message, type = 'info') {
-            const container = document.getElementById('toastContainer');
-            const toast = document.createElement('div');
-            toast.className = `toast toast-${type}`;
-            toast.innerHTML = `
-                <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
-                <span>${message}</span>
-            `;
-            container.appendChild(toast);
+        // Close mobile menu when clicking outside
+        document.addEventListener('click', (e) => {
+            const mobileMenu = document.getElementById('mobileMenu');
+            const navToggle = document.getElementById('navToggle');
 
-            setTimeout(() => toast.classList.add('show'), 10);
-            setTimeout(() => {
-                toast.classList.remove('show');
-                setTimeout(() => toast.remove(), 300);
-            }, 3000);
-        }
-
-        // API helper
-        async function apiCall(url, options = {}) {
-            try {
-                const response = await fetch(url, {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        ...options.headers
-                    },
-                    ...options
-                });
-                const data = await response.json();
-                if (!response.ok) {
-                    throw new Error(data.error || 'Request failed');
-                }
-                return data;
-            } catch (error) {
-                showToast(error.message, 'error');
-                throw error;
+            if (mobileMenu.classList.contains('active') &&
+                !mobileMenu.contains(e.target) &&
+                !navToggle.contains(e.target)) {
+                mobileMenu.classList.remove('active');
+                document.querySelector('#navToggle i').classList.replace('fa-times', 'fa-bars');
             }
-        }
+        });
     </script>
 
     {% block scripts %}{% endblock %}

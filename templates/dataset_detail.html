@@ -2,6 +2,10 @@
 
 {% block title %}{{ dataset.name }}{% endblock %}
 
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/dataset_import.css') }}">
+{% endblock %}
+
 {% block content %}
 <div class="page-header">
     <div class="container">
@@ -71,6 +75,151 @@
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
                 <span id="progressText">Uploading...</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Pre-labeled Dataset [NEW FEATURE] -->
+    <div class="card import-card">
+        <div class="card-header">
+            <h2><i class="fas fa-file-import"></i> Import Pre-labeled Dataset</h2>
+            <p class="subtitle">Already have labeled images? Import them instantly!</p>
+        </div>
+        <div class="card-body">
+            <div class="import-tabs">
+                <button class="import-tab active" data-tab="zip">
+                    <i class="fas fa-file-archive"></i> Upload ZIP Files
+                </button>
+                <button class="import-tab" data-tab="info">
+                    <i class="fas fa-info-circle"></i> How It Works
+                </button>
+            </div>
+
+            <!-- ZIP Upload Tab -->
+            <div class="import-tab-content" id="zipTab">
+                <div class="import-instruction">
+                    <i class="fas fa-lightbulb"></i>
+                    <p>Upload two ZIP files: one containing images and another containing YOLO format label files
+                        (.txt).
+                        The system will automatically match files by name.</p>
+                </div>
+
+                <div class="upload-grid">
+                    <div class="upload-item">
+                        <label for="imagesZipInput">
+                            <i class="fas fa-images"></i> Images ZIP *
+                        </label>
+                        <div class="file-drop-zone" id="imagesDropZone">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Drop images.zip here or click to browse</p>
+                            <input type="file" id="imagesZipInput" accept=".zip" hidden>
+                            <span class="file-name" id="imagesFileName"></span>
+                        </div>
+                    </div>
+
+                    <div class="upload-item">
+                        <label for="labelsZipInput">
+                            <i class="fas fa-tag"></i> Labels ZIP (Optional)
+                        </label>
+                        <div class="file-drop-zone" id="labelsDropZone">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <p>Drop labels.zip here or click to browse</p>
+                            <input type="file" id="labelsZipInput" accept=".zip" hidden>
+                            <span class="file-name" id="labelsFileName"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="import-options">
+                    <h4><i class="fas fa-sliders-h"></i> Import Options</h4>
+                    <div class="option-grid">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="validateLabels" checked>
+                            <span>Validate YOLO label format</span>
+                            <small>Check for format errors and invalid coordinates</small>
+                        </label>
+
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="autoSplit">
+                            <span>Auto-split into train/val</span>
+                            <small>Automatically divide dataset after import</small>
+                        </label>
+
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="overwriteExisting">
+                            <span>Overwrite existing files</span>
+                            <small>Replace files if they already exist</small>
+                        </label>
+                    </div>
+
+                    <div class="split-ratio-control" id="splitRatioControl" style="display: none;">
+                        <label>Validation Split: <span id="importSplitValue">20</span>%</label>
+                        <input type="range" id="importSplitRatio" min="10" max="40" value="20">
+                    </div>
+                </div>
+
+                <button class="btn btn-primary btn-lg import-btn" onclick="startImport()" id="importBtn">
+                    <i class="fas fa-file-import"></i> Import Dataset
+                </button>
+            </div>
+
+            <!-- Info Tab -->
+            <div class="import-tab-content" id="infoTab" style="display: none;">
+                <div class="info-grid">
+                    <div class="info-section">
+                        <h4><i class="fas fa-question-circle"></i> What You Need</h4>
+                        <ul>
+                            <li><strong>Images ZIP:</strong> JPEG, PNG or other image formats</li>
+                            <li><strong>Labels ZIP:</strong> YOLO format .txt files (optional)</li>
+                            <li><strong>Matching Names:</strong> img001.jpg ↔ img001.txt</li>
+                        </ul>
+                    </div>
+
+                    <div class="info-section">
+                        <h4><i class="fas fa-file-alt"></i> YOLO Label Format</h4>
+                        <p>Each line in .txt file:</p>
+                        <code>class_id x_center y_center width height</code>
+                        <p>All coordinates normalized to [0, 1]</p>
+                        <p>Example: <code>0 0.5 0.5 0.3 0.4</code></p>
+                    </div>
+
+                    <div class="info-section">
+                        <h4><i class="fas fa-check-circle"></i> What Happens</h4>
+                        <ol>
+                            <li>System extracts and validates ZIP files</li>
+                            <li>Images matched with labels by filename</li>
+                            <li>Labels validated for correct YOLO format</li>
+                            <li>Files imported to dataset</li>
+                            <li>Detailed report shown with any errors</li>
+                        </ol>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Progress Indicator -->
+            <div id="importProgress" class="import-progress" style="display: none;">
+                <div class="progress-spinner">
+                    <i class="fas fa-circle-notch fa-spin"></i>
+                </div>
+                <h3>Importing Dataset...</h3>
+                <p id="importProgressText">Preparing files...</p>
+                <div class="progress-bar-container">
+                    <div class="progress-bar-fill" id="importProgressBar"></div>
+                </div>
+            </div>
+
+            <!-- Results -->
+            <div id="importResults" class="import-results" style="display: none;">
+                <div class="results-header">
+                    <i class="fas fa-check-circle"></i>
+                    <h3 id="resultsTitle">Import Complete!</h3>
+                </div>
+                <div class="results-stats" id="resultsStats"></div>
+                <div class="results-errors" id="resultsErrors" style="display: none;"></div>
+                <div class="results-actions">
+                    <button class="btn btn-secondary" onclick="closeResults()">Close</button>
+                    <button class="btn btn-primary" onclick="location.reload()">Refresh Page</button>
+                </div>
             </div>
         </div>
     </div>
@@ -307,11 +456,272 @@
         }
     }
 
+    // ========================================================================
+    // IMPORT FEATURE JAVASCRIPT
+    // ========================================================================
+
+    // Import tab switching
+    document.querySelectorAll('.import-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.import-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+
+            const tabName = tab.dataset.tab;
+            document.querySelectorAll('.import-tab-content').forEach(content => {
+                content.style.display = 'none';
+            });
+            document.getElementById(tabName + 'Tab').style.display = 'block';
+        });
+    });
+
+    // File drop zones
+    const imagesDropZone = document.getElementById('imagesDropZone');
+    const labelsDropZone = document.getElementById('labelsDropZone');
+    const imagesZipInput = document.getElementById('imagesZipInput');
+    const labelsZipInput = document.getElementById('labelsZipInput');
+
+    function setupDropZone(dropZone, fileInput, fileNameSpan) {
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            dropZone.classList.remove('dragover');
+
+            const files = e.dataTransfer.files;
+            if (files.length > 0 && files[0].name.endsWith('.zip')) {
+                fileInput.files = files;
+                document.getElementById(fileNameSpan).textContent = files[0].name;
+                dropZone.classList.add('has-file');
+            } else {
+                showToast('Please drop a ZIP file', 'error');
+            }
+        });
+
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                document.getElementById(fileNameSpan).textContent = fileInput.files[0].name;
+                dropZone.classList.add('has-file');
+            }
+        });
+    }
+
+    setupDropZone(imagesDropZone, imagesZipInput, 'imagesFileName');
+    setupDropZone(labelsDropZone, labelsZipInput, 'labelsFileName');
+
+    // Auto-split checkbox toggle
+    document.getElementById('autoSplit').addEventListener('change', (e) => {
+        document.getElementById('splitRatioControl').style.display =
+            e.target.checked ? 'block' : 'none';
+    });
+
+    // Import split ratio slider
+    document.getElementById('importSplitRatio').addEventListener('input', (e) => {
+        document.getElementById('importSplitValue').textContent = e.target.value;
+    });
+
+    // File to base64 conversion
+    function fileToBase64(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                // Remove data:application/zip;base64, prefix
+                const base64 = reader.result.split(',')[1];
+                resolve(base64);
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // Start import process
+    async function startImport() {
+        // Validate inputs
+        const imagesFile = imagesZipInput.files[0];
+        if (!imagesFile) {
+            showToast('Please select an images ZIP file', 'error');
+            return;
+        }
+
+        const labelsFile = labelsZipInput.files[0];
+        const validateLabels = document.getElementById('validateLabels').checked;
+        const autoSplit = document.getElementById('autoSplit').checked;
+        const overwriteExisting = document.getElementById('overwriteExisting').checked;
+        const valRatio = parseInt(document.getElementById('importSplitRatio').value) / 100;
+
+        // Disable import button
+        const importBtn = document.getElementById('importBtn');
+        importBtn.disabled = true;
+        importBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Processing...';
+
+        // Show progress
+        document.getElementById('zipTab').style.display = 'none';
+        document.getElementById('importProgress').style.display = 'block';
+
+        try {
+            // Convert files to base64
+            document.getElementById('importProgressText').textContent = 'Encoding images...';
+            const imagesBase64 = await fileToBase64(imagesFile);
+
+            let labelsBase64 = null;
+            if (labelsFile) {
+                document.getElementById('importProgressText').textContent = 'Encoding labels...';
+                labelsBase64 = await fileToBase64(labelsFile);
+            }
+
+            // Prepare request payload
+            const payload = {
+                source_type: 'zip',
+                images_source: imagesBase64,
+                labels_source: labelsBase64,
+                validate_labels: validateLabels,
+                auto_split: autoSplit,
+                overwrite_existing: overwriteExisting,
+                val_ratio: valRatio
+            };
+
+            // Send import request
+            document.getElementById('importProgressText').textContent = 'Importing dataset...';
+
+            const response = await fetch(`/api/dataset/${datasetName}/import`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const result = await response.json();
+
+            // Hide progress, show results
+            document.getElementById('importProgress').style.display = 'none';
+            displayImportResults(result, response.status);
+
+        } catch (error) {
+            console.error('Import error:', error);
+            document.getElementById('importProgress').style.display = 'none';
+            document.getElementById('zipTab').style.display = 'block';
+            showToast(`Import failed: ${error.message}`, 'error');
+        } finally {
+            // Re-enable button
+            importBtn.disabled = false;
+            importBtn.innerHTML = '<i class="fas fa-file-import"></i> Import Dataset';
+        }
+    }
+
+    // Display import results
+    function displayImportResults(result, httpStatus) {
+        const resultsDiv = document.getElementById('importResults');
+        const resultsStats = document.getElementById('resultsStats');
+        const resultsErrors = document.getElementById('resultsErrors');
+        const resultsTitle = document.getElementById('resultsTitle');
+
+        // Set title based on status
+        if (httpStatus === 200) {
+            resultsTitle.innerHTML = '<i class="fas fa-check-circle"></i> Import Successful!';
+            resultsTitle.className = 'success';
+        } else if (httpStatus === 207) {
+            resultsTitle.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Import Partially Successful';
+            resultsTitle.className = 'warning';
+        } else {
+            resultsTitle.innerHTML = '<i class="fas fa-times-circle"></i> Import Failed';
+            resultsTitle.className = 'error';
+        }
+
+        // Display statistics
+        resultsStats.innerHTML = `
+            <div class="stat-item">
+                <i class="fas fa-images"></i>
+                <div>
+                    <strong>${result.total_images || 0}</strong>
+                    <span>Total Images</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <i class="fas fa-tags"></i>
+                <div>
+                    <strong>${result.images_with_labels || 0}</strong>
+                    <span>With Labels</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <i class="fas fa-file"></i>
+                <div>
+                    <strong>${result.images_without_labels || 0}</strong>
+                    <span>Without Labels</span>
+                </div>
+            </div>
+            <div class="stat-item">
+                <i class="fas fa-bullseye"></i>
+                <div>
+                    <strong>${result.total_annotations || 0}</strong>
+                    <span>Annotations</span>
+                </div>
+            </div>
+        `;
+
+        // Display errors and warnings
+        if (result.errors && result.errors.length > 0) {
+            resultsErrors.style.display = 'block';
+            const errorList = result.errors.slice(0, 10).map(err => `
+                <div class="error-item">
+                    <i class="fas fa-exclamation-circle"></i>
+                    <div>
+                        <strong>${err.file}</strong>
+                        ${err.line ? `Line ${err.line}: ` : ''}
+                        ${err.message}
+                    </div>
+                </div>
+            `).join('');
+
+            const moreErrors = result.errors.length > 10 ?
+                `<p class="more-errors">...and ${result.errors.length - 10} more errors</p>` : '';
+
+            resultsErrors.innerHTML = `
+                <h4><i class="fas fa-bug"></i> Errors (${result.errors.length})</h4>
+                ${errorList}
+                ${moreErrors}
+            `;
+        }
+
+        // Show warnings if any
+        if (result.warnings && result.warnings.length > 0) {
+            const warningHtml = `
+                <div class="warnings-section">
+                    <h4><i class="fas fa-info-circle"></i> Warnings</h4>
+                    ${result.warnings.map(w => `<p>• ${w}</p>`).join('')}
+                </div>
+            `;
+            resultsStats.innerHTML += warningHtml;
+        }
+
+        resultsDiv.style.display = 'block';
+    }
+
+    // Close results
+    function closeResults() {
+        document.getElementById('importResults').style.display = 'none';
+        document.getElementById('zipTab').style.display = 'block';
+    }
+
     function openAnnotator(imagePath) {
         window.location.href = `/annotate/${datasetName}?image=${encodeURIComponent(imagePath)}`;
     }
 
     // Initialize
     loadImages();
+
 </script>
 {% endblock %}

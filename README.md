@@ -118,6 +118,8 @@ python app.py
 
 Open your browser and navigate to `http://localhost:5000`
 
+If PostgreSQL is unavailable, the app now falls back to a local SQLite database so it can still start. Set `EASIVISI_REQUIRE_POSTGRES=1` if you want startup to fail instead of using the fallback.
+
 ### 2. Create a Dataset
 
 Use the web interface to:
